@@ -9,7 +9,7 @@ real Wordle answers.
 
 ## Requirements
 
-- Python 3.10+ (uses `match` statements)
+- Python 3.9+
 - Tkinter (bundled with most Python installs; on Linux you may need to
   install a package such as `python3-tk`)
 
