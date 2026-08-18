@@ -1,10 +1,23 @@
+"""
+File: wordle.py
+
+Description: Core Wordle-solving logic. Filters the word list down to
+candidates that match known letter positions/constraints, then scores
+each candidate by summed letter frequency so the UI can rank guesses.
+"""
+
 from helpers import wordle_words
 
 
 class Words:
+    """Holds the word list, letter-frequency tables, and the search/scoring logic."""
+
     def __init__(self):
-        self.map = dict()
+        self.map = dict()  # word -> score, populated by find()
         self.word_size = 5
+
+        # General English letter frequency (%). Used by the UI to populate the
+        # letter-selection list box (see WordleUI.create_list_box).
         self.letters = {
             "A": 8.34,
             "B": 1.54,
@@ -34,6 +47,7 @@ class Words:
             "Z": 0.06,
         }
 
+        # Recommended opening guesses, shown to the user on startup.
         self.starters = ['arose', 'soare', 'later',
                          'saine', 'tares', 'lares',
                          'rales', 'rates', 'cares',
@@ -41,6 +55,8 @@ class Words:
                          'sough', 'atone', 'notes',
                          'audio', 'chevy', 'rides']
 
+        # Letter frequency (%) specific to the Wordle answer list, used by score()
+        # to rank candidate words.
         self.wordle_letters = {
             'S': 45.8,
             'E': 44,
@@ -72,25 +88,35 @@ class Words:
         }
 
     def score(self, word):
+        """Sum per-letter Wordle-frequency scores for a word; higher is more likely useful."""
         score = 0
         for letter in word:
             score += self.wordle_letters[letter]
         return score
 
     def find(self, word_list, bad_list, wild_list, not_list, repeats):
+        """Filter the word list down to valid candidates and score them.
+
+        word_list: list of 5 known letters by position ('' if unknown/green not set).
+        bad_list: letters confirmed absent from the word (gray).
+        wild_list: letters known to be in the word but position unknown (yellow).
+        not_list: list of 5 lists, letters known NOT to be at that position (yellow at a
+                   different spot).
+        repeats: if False, reject words with any repeated letter.
+
+        Populates self.map with {WORD: score} for every candidate that passes all
+        constraints.
+        """
         word_list_len = len(word_list)
-        print("word_list: ", word_list)
-        print("bad_list: ", bad_list)
-        print("wild_list: ", wild_list)
-        print("repeats: ", repeats)
-        print("repeats: ", repeats)
-        print("---------------------")
+
         self.map.clear()
 
+        # A letter can't be both confirmed-absent and placed as a known letter.
         for letter in word_list:
             if letter in bad_list:
                 print(f'{letter} in bad and good list')
                 return
+
         count = 0
         for item in wordle_words.wordle_words:
             count += 1
@@ -99,10 +125,12 @@ class Words:
                 store = True
                 check_list = list(item.upper())
 
+                # Reject words containing any letter confirmed absent (gray).
                 for letter in check_list:
                     if letter in bad_list:
                         store = False
 
+                # Optionally reject words with repeated letters.
                 if not repeats:
                     for i in range(len(check_list)):
                         for j in range(len(check_list)):
@@ -114,15 +142,19 @@ class Words:
 
                 if store:
                     for i in range(word_list_len):
+                        # Reject if a known-yellow letter is placed where it's known
+                        # not to belong.
                         if check_list[i] in not_list[i]:
                             store = False
                             break
 
+                        # Reject if any known-present (yellow) letter is missing entirely.
                         for letter in wild_list:
                             if letter not in check_list:
                                 store = False
                                 break
 
+                        # Match confirmed (green) letters by position; '' means unknown.
                         if word_list[i] == '' or word_list[i] == check_list[i]:
                             continue
                         elif word_list[i] != check_list[i]:
@@ -131,6 +163,8 @@ class Words:
 
                     if store:
                         score = 0
+                        # Only the first 2316 entries are common Wordle answers;
+                        # words after that are valid guesses but not scored.
                         if count < 2316:
                             score = self.score(item.upper())
                         self.map[item.upper()] = score

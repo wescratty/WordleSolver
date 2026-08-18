@@ -1,17 +1,14 @@
 #!/usr/bin/env python3
 """
-Auther: Wes Cratty
+Author: Wes Cratty
 Created: 1/3/2024
-File: format.py
+File: filemanager.py
 
 Description: Handle file read / writes
 
 """
 
 import os
-import json
-import re
-
 
 
 def get_file_contents(_path):

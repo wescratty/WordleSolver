@@ -222,7 +222,10 @@ class SuperTk:
         item.pack(side=tk.TOP, expand=tk.TRUE, pady=self.pady, padx=self.padx)
 
     def generate_path_file_chooser_frame(self, title, append_to, call_back):
-        """Generates a label frame with a text field and a button"""
+        """Generates a label frame with a text entry field.
+
+        call_back is accepted for API symmetry with other generate_* helpers
+        but is currently unused (no button is attached to invoke it)."""
         ret_obj = {"lf": self.get_label_frame(title, append_to), "rb_list": list(), "var": self.get_str_var()}
 
         def pack():
@@ -232,19 +235,7 @@ class SuperTk:
         ret_obj["pack"] = pack
 
         e_b = self.get_entry_box(append_to=ret_obj["lf"], str_var=ret_obj["var"], width=100)
-
-        # button = self.tk.Button(
-        #     ret_obj["lf"],
-        #     text='...',
-        #     width=3,
-        #     height=1,
-        #     bg=self.bg,
-        #     fg=self.fg,
-        #     command=call_back
-        # )
-        # append items to list
         ret_obj["rb_list"].append(e_b)
-        # ret_obj["rb_list"].append(button)
         return ret_obj
 
     def generate_label_frame_of_buttons(self, title, b_names, call_back, append_to):
