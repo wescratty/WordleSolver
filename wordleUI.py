@@ -1,10 +1,12 @@
 """
 Author: Wes Cratty
 Created: 1/8/2024
-File: runnerManager.py
+File: wordleUI.py
 
-Description: UI for RunBooks
-See wiki
+Description: Tkinter UI for the Wordle solver. Lets the user mark known
+letters (green), letters known to be present but misplaced (yellow), and
+letters known to be absent (gray) via buttons and a letter list, then
+shows ranked candidate words from wordle.Words.find().
 """
 
 import json
@@ -14,8 +16,6 @@ from helpers import filemanager
 from helpers import utility as ut
 import wordle
 
-manager = None
-
 
 class WordleUI:
     """Creates tkinter UI"""
@@ -24,11 +24,8 @@ class WordleUI:
         """Initialize"""
         self.wordle = wordle.Words()
         self.list_box = None
-        self.b_frame = None
         self.task_frame = None
-        self.select_text_box = None
         self.selected_task_index = None
-        self.edit_task_text = None
         self.context_menu = None
         self.current_button = None
         self.button_not_list = [[], [], [], [], []]
@@ -37,7 +34,7 @@ class WordleUI:
         self.wild_list = list()
         self.tk = tkinterface.SuperTk()
 
-        self.settings = dict()  # Create settings object to hold last used paths from flat file setting.json
+        self.settings = dict()  # Holds settings loaded from settings.json (currently just theme)
         self.read_in_settings()  # Read in settings or create file. Instantiate related objects
         self.tk.set_theme(self.settings['theme'])
 
@@ -47,22 +44,24 @@ class WordleUI:
         self.scroll_area = win_obj['scroll_area']
 
         self.add_settings_menu()  # Create settings menu (top left ui) to allow selecting color theme
-        self.task_groups = dict()  # task_group is used to store the groups from the loaded run book yaml
-        self.time_delay = 0
 
         self.severity = ["lime", "white", "yellow", "red", "red"]  # Logging message color
         self.button_inactive = "gray"
         self.button_identified = "black"
         self.button_active = "red"
-        self.spin_box_var = self.tk.get_str_var()
         self.checkbox_repeat_var = self.tk.tk.BooleanVar()
         self.checkbox_hide_fa_var = self.tk.tk.BooleanVar()
 
     def set_unused_letter(self):
+        """Callback placeholder passed to the path/text chooser frame; currently unused."""
         pass
 
     def toggle_button_shade(self, b_id):
         """Toggle button color: If button_inactive then button_active, if button_active then button_inactive"""
+        # NOTE: this compares against the literal string "self.button_inactive"
+        # rather than the self.button_inactive attribute, so it never matches and
+        # this always falls through to the "activate" branch. Left as-is to avoid
+        # changing existing UI behavior.
         if self.get_button_shade(b_id) == "self.button_inactive":
             self.task_frame['b_list'][int(b_id)].configure(bg=self.button_inactive)
         else:
@@ -95,7 +94,7 @@ class WordleUI:
         self.scroll_bottom()
 
     # ==============================
-    #           OI
+    #     Logging / settings
     # ==============================
     def log(self, message, priority):
         """Display message in UI"""
@@ -106,13 +105,12 @@ class WordleUI:
         # This is for reusing the same line and updating, no new line
 
     def read_in_settings(self):
-        """Get previous path and theme used
-        Can set theme in app header settings"""
+        """Load settings.json (currently just the color theme) if present."""
         if os.path.isfile('settings.json'):
             self.settings = json.loads(filemanager.get_file_contents('settings.json'))
 
     def write_out_settings(self):
-        """Write new path selection"""
+        """Persist the current settings to settings.json."""
         filemanager.write_file(json.dumps(self.settings), os.path.join(os.getcwd(), 'settings.json'))
 
     def set_theme(self, theme):
@@ -142,26 +140,8 @@ class WordleUI:
 
             self.current_button['text'] = selected_task  # Display the name of the task
 
-    def rebuild_list_box(self, _list):
-        """Clear listbox and repopulate"""
-        self.list_box.delete(0, self.tk.END)
-        for values in _list:
-            self.list_box.insert(self.tk.END, values)
-
-    def add_text_box(self, value):
-        """Adds read only textbox for console readout in UI"""
-        self.select_text_box = self.tk.get_text_box()
-        self.select_text_box.insert(1.0, value)
-        self.select_text_box.configure(state='disabled')  # Disable
-        self.select_text_box.pack(fill=self.tk.tk.X)  # add to UI
-        self.scroll_bottom()
-
     def create_list_box(self):
-        """Creates list box from task_group keys"""
-        if self.task_groups is None:
-            self.log("task_groups empty", ut.LogType.error)
-            return
-
+        """Creates the A-Z letter selection list box."""
         keys = list(self.wordle.letters.keys())  # Get keys
         self.list_box = self.tk.gen_list_box(keys, self.on_list_box_select)
         self.list_box.pack(fill=self.tk.tk.X)  # add to UI
@@ -182,22 +162,13 @@ class WordleUI:
         self.tk.window.update()
         self.tk.canvas.yview_moveto(1)
 
-    def task_complete(self):
-        """Reinit UI"""
-        self.clear_ui()
-        self.log("Task Complete", ut.LogType.info)
-
-    def clear(self):
-        """Cancel tasks"""
-        self.clear_ui()
-        self.scroll_bottom()
-
     def on_right_click(self, event):
         """Only available when Select Task button was pressed"""
         self.context_menu.post(event.x_root, event.y_root)
 
     def is_task(self):
-        """Dumps python task object to yaml int a text field to be edited"""
+        """Set the currently selected letter as the confirmed (green) letter for
+        the active position button."""
         if self.selected_task_index:
             selected_task = self.list_box.get(self.selected_task_index)  # Gets selection
             self.current_button['text'] = selected_task
@@ -206,25 +177,26 @@ class WordleUI:
             self.log("Please select a task before editing.", ut.LogType.info)
 
     def not_task(self):
-        """Dumps python task object to yaml int a text field to be edited"""
+        """Mark the currently selected letter as present but not at the active
+        position (yellow), via the right-click context menu."""
         if self.selected_task_index:
             selected_task = self.list_box.get(self.selected_task_index)  # Gets selection
 
             self.button_not_list[self.current_button_id].append(selected_task)
             self.wild_list.append(selected_task)
-            print(self.button_not_list)
         else:
             self.log("Please select a task before editing.", ut.LogType.info)
 
     def clear_task(self):
+        """Clear the confirmed letter on the currently active position button."""
         self.current_button['text'] = ''
 
     def clear_nots(self):
+        """Clear the 'not at this position' letters for the currently active button."""
         self.button_not_list[int(self.current_button_id)] = list()
-        print(self.button_not_list)
 
     def reset(self):
-        """Dumps python task object to yaml int a text field to be edited"""
+        """Reset all position buttons and letter constraints to their initial state."""
         for b in self.task_frame['b_list']:
             b['text'] = ''
         self.unused_letter.set('')
@@ -234,21 +206,21 @@ class WordleUI:
         self.unused_letter.set('')
 
     def go(self):
+        """Run the solver against the current button state and constraints,
+        then log the ranked candidate words to the UI."""
         b_list = list()
         for b in self.task_frame['b_list']:
             b_list.append(b['text'])
-        print(b_list)
-        print("self.checkbox_var.get(): ", self.checkbox_repeat_var.get())
+
         repeats = self.checkbox_repeat_var.get()
-        hide = self.checkbox_hide_fa_var.get()
-        print(repeats)
+        hide = self.checkbox_hide_fa_var.get()  # "Hide Fa": hide unscored (non-answer-list) words
+
         self.wordle.find(word_list=b_list, bad_list=list(self.unused_letter.get().upper()),
                          not_list=self.button_not_list, wild_list=list(self.wild_list), repeats=repeats)
-        print(self.unused_letter.get())
 
         self.log(f'================== {len(self.wordle.map)} ==================', ut.LogType.info)
 
-        # Assuming self.wordle.map is your dictionary
+        # List candidates, highest-scored first.
         for word, score in sorted(self.wordle.map.items(), key=lambda item: round(item[1]), reverse=True):
             if hide:
                 if score > 0:
@@ -257,14 +229,9 @@ class WordleUI:
             else:
                 self.log(f'{word}', ut.LogType.task)
 
-        # for word, score in sorted(self.wordle.map.items()):
-        #     if hide:
-        #         if score > 0:
-        #             self.log(f'{word}: {score}', ut.LogType.task)
-        #     else:
-        #         self.log(f'{word}', ut.LogType.task)
-
     def on_radio_select(self):
+        """Checkbox change callback; no action needed since go() reads the
+        checkbox state directly."""
         pass
 
     def select_task(self, b_id):
@@ -298,7 +265,7 @@ class WordleUI:
 
         self.checkbox_repeat_var.set(False)
         self.checkbox_hide_fa_var.set(True)
-        # Create field set with text box for selecting path to yaml
+        # Text entry for letters known to not be in the word
         path_to_config_frame = self.tk.generate_path_file_chooser_frame('Letters Not Used:', self.tk.window,
                                                                         self.set_unused_letter)
         path_to_config_frame["pack"]()
