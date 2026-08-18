@@ -343,23 +343,23 @@ class SuperTk:
         return obj
 
     def set_theme(self, theme=1):
-        match theme:
-            case 0:
-                self.fg = 'black'
-                self.bg = 'white'
-                self.opacity = 1
-            case 1:
-                self.fg = 'lime'
-                self.bg = 'black'
-                self.opacity = 0.90
-            case 2:
-                self.fg = 'white'
-                self.bg = 'black'
-                self.opacity = 1
-            case _:
-                self.fg = 'firebrick'
-                self.bg = 'black'
-                self.opacity = 0.90
+        """Set fg/bg/opacity for the given theme id (see utility.Theme)."""
+        if theme == 0:
+            self.fg = 'black'
+            self.bg = 'white'
+            self.opacity = 1
+        elif theme == 1:
+            self.fg = 'lime'
+            self.bg = 'black'
+            self.opacity = 0.90
+        elif theme == 2:
+            self.fg = 'white'
+            self.bg = 'black'
+            self.opacity = 1
+        else:
+            self.fg = 'firebrick'
+            self.bg = 'black'
+            self.opacity = 0.90
 
     def add_settings_menu(self):
         # Create a menu bar
